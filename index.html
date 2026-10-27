@@ -39,9 +39,23 @@ textarea{flex:1;min-width:0;font:inherit;color:var(--text);background:none;borde
 #ask:disabled{opacity:.4;cursor:default}
 .foot{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;padding:6px 6px 0;min-height:24px}
 .foot button{font:inherit;font-size:12px;background:none;border:0;color:var(--muted);cursor:pointer;text-decoration:underline;padding:0}
+#gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center}
+#gate[hidden]{display:none}
+#gate h2{margin:0;font-size:28px}
+#gate p{margin:0;color:var(--muted);font-size:14px}
+#gate form{display:flex;gap:8px;width:min(340px,100%)}
+#gate input{flex:1;min-width:0;font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+#gate button{font:inherit;font-weight:600;border:0;border-radius:12px;padding:0 18px;background:var(--accent);color:var(--accent-text);cursor:pointer}
+#gerr{min-height:20px;color:#d33}
 </style>
 </head>
 <body>
+<div id="gate">
+  <h2>Danny Ai</h2>
+  <p>Enter the password to continue</p>
+  <form id="gform"><input id="gpw" type="password" placeholder="Password" autocomplete="current-password"><button>Enter</button></form>
+  <div id="gerr" role="alert"></div>
+</div>
 <header><b>Danny Ai</b><small>Use at your own risk</small></header>
 <main>
   <div class="log" id="log">
@@ -158,6 +172,27 @@ textarea{flex:1;min-width:0;font:inherit;color:var(--text);background:none;borde
   document.querySelectorAll(".chips button").forEach(function(b){
     b.onclick=function(){$("q").value=b.dataset.q;$("q").focus();grow()};
   });
+})();
+</script>
+<script>
+(function(){
+  var g=document.getElementById("gate"),pw=document.getElementById("gpw"),er=document.getElementById("gerr");
+  function check(p,cb){
+    fetch("/.netlify/functions/chat",{method:"POST",headers:{"content-type":"application/json","x-pass":p},body:JSON.stringify({check:true})})
+      .then(function(r){cb(r.ok,r.status)}).catch(function(){cb(false,0)});
+  }
+  var saved="";try{saved=sessionStorage.getItem("dp")||""}catch(e){}
+  check(saved,function(ok,st){
+    if(ok){g.hidden=true}
+    else{if(st===0)er.textContent="Can’t reach the server. Open the site from your Netlify link.";pw.focus()}
+  });
+  document.getElementById("gform").onsubmit=function(e){
+    e.preventDefault();er.textContent="";
+    check(pw.value,function(ok,st){
+      if(ok){try{sessionStorage.setItem("dp",pw.value)}catch(x){}g.hidden=true}
+      else er.textContent=st===0?"Can’t reach the server.":"Wrong password. Try again.";
+    });
+  };
 })();
 </script>
 </body>
