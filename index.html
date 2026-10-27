@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Danny Ai</title>
+<style>
+:root{--bg:#fafaf9;--surface:#fff;--text:#1c1b19;--muted:#77736b;--line:#e7e4de;--accent:#1c1b19;--accent-text:#fff;--user:#f0eee9;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121211;--surface:#1b1a19;--text:#ece9e2;--muted:#9a968d;--line:#2d2b28;--accent:#ece9e2;--accent-text:#121211;--user:#262523;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121211;--surface:#1b1a19;--text:#ece9e2;--muted:#9a968d;--line:#2d2b28;--accent:#ece9e2;--accent-text:#121211;--user:#262523;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{text-align:center;padding:12px 10px 8px;border-bottom:1px solid var(--line)}
+header b{font-size:17px}
+header small{display:block;color:var(--muted);font-size:12px}
+main{flex:1;min-height:0;display:flex;flex-direction:column;max-width:760px;width:100%;margin:0 auto;padding:12px 16px}
+.log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:6px 2px 14px}
+.msg{white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--user);padding:10px 14px;border-radius:18px;max-width:85%}
+.msg.ai{align-self:stretch}
+.msg img{display:block;max-width:120px;max-height:120px;border-radius:10px;margin:0 6px 6px 0;float:left}
+.msg .cl{clear:both}
+.copy{margin-top:6px;font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
+.empty{margin:auto;text-align:center;color:var(--muted)}
+.empty h2{color:var(--text);font-weight:600;font-size:26px;margin:0 0 2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center}
+.chips button{font:inherit;font-size:14px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.prev{display:flex;gap:8px;flex-wrap:wrap;padding:0 4px 8px}
+.prev div{position:relative}
+.prev img{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+.prev button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-text);font-size:12px;line-height:20px;padding:0;cursor:pointer}
+.box{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:6px 8px}
+textarea{flex:1;min-width:0;font:inherit;color:var(--text);background:none;border:0;outline:0;resize:none;max-height:160px;padding:7px 0}
+.box button{width:36px;height:36px;border-radius:50%;border:0;font-size:20px;cursor:pointer;flex:none;line-height:1}
+#plus{background:var(--user);color:var(--text)}
+#ask{background:var(--accent);color:var(--accent-text)}
+#ask:disabled{opacity:.4;cursor:default}
+.foot{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;padding:6px 6px 0;min-height:24px}
+.foot button{font:inherit;font-size:12px;background:none;border:0;color:var(--muted);cursor:pointer;text-decoration:underline;padding:0}
+</style>
+</head>
+<body>
+<header><b>Danny Ai</b><small>Use at your own risk</small></header>
+<main>
+  <div class="log" id="log">
+    <div class="empty" id="empty">
+      <h2>Danny Ai</h2>
+      Use at your own risk
+      <div class="chips">
+        <button data-q="Write a 500-word essay on ">Write an essay</button>
+        <button data-q="Help me understand ">Explain a topic</button>
+        <button data-q="Write a polite email to ">Draft an email</button>
+        <button data-q="Give me 10 ideas for ">Brainstorm</button>
+      </div>
+    </div>
+  </div>
+  <div class="prev" id="prev"></div>
+  <div class="box">
+    <button id="plus" aria-label="Attach images">+</button>
+    <textarea id="q" rows="1" placeholder="Message Danny Ai"></textarea>
+    <button id="ask" aria-label="Send">↑</button>
+  </div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+  <div class="foot"><span id="status"></span><button id="clear">New chat</button></div>
+</main>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var history=[], busy=false, atts=[];
+  var SYS="You are Danny Ai, a capable, friendly general-purpose assistant. Do the task the person asks for (essays, homework help, emails, summaries, brainstorming, code, questions about attached images, and so on) fully and well. Write in plain text without markdown symbols like ** or ##, using normal paragraphs and simple lists when needed. Ask a brief question only if the request is truly unclear.\n\n";
+
+  function addMsg(role,text,thumbs){
+    var e=$("empty"); if(e) e.remove();
+    var d=document.createElement("div"); d.className="msg "+role;
+    (thumbs||[]).forEach(function(u){var i=document.createElement("img");i.src=u;i.alt="";d.appendChild(i)});
+    if(thumbs&&thumbs.length){var c=document.createElement("div");c.className="cl";d.appendChild(c)}
+    var t=document.createElement("div"); t.textContent=text; d.appendChild(t);
+    $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight;
+    return {box:d,text:t};
+  }
+  function addCopy(m,text){
+    var b=document.createElement("button"); b.className="copy"; b.textContent="Copy";
+    b.onclick=function(){
+      try{navigator.clipboard.writeText(text).then(function(){b.textContent="Copied"},function(){b.textContent="Select to copy"})}
+      catch(e){b.textContent="Select to copy"}
+    };
+    m.box.appendChild(b);
+  }
+  function grow(){var q=$("q");q.style.height="auto";q.style.height=Math.min(q.scrollHeight,160)+"px"}
+
+  function shrink(file){
+    return new Promise(function(res){
+      var url=URL.createObjectURL(file), im=new Image();
+      im.onload=function(){
+        function mk(max,type){
+          var s=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement("canvas");
+          cv.width=Math.round(im.width*s);cv.height=Math.round(im.height*s);
+          cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);return cv;
+        }
+        var big=mk(1600),th=mk(112).toDataURL("image/jpeg",.7);
+        big.toBlob(function(b){URL.revokeObjectURL(url);res({blob:b||file,thumb:th})},"image/jpeg",.85);
+      };
+      im.onerror=function(){URL.revokeObjectURL(url);res(null)};
+      im.src=url;
+    });
+  }
+  function renderPrev(){
+    var p=$("prev"); p.innerHTML="";
+    atts.forEach(function(a,i){
+      var d=document.createElement("div"),im=document.createElement("img"),x=document.createElement("button");
+      im.src=a.thumb;im.alt="";x.textContent="×";x.setAttribute("aria-label","Remove image");
+      x.onclick=function(){atts.splice(i,1);renderPrev()};
+      d.appendChild(im);d.appendChild(x);p.appendChild(d);
+    });
+  }
+  $("plus").onclick=function(){$("file").click()};
+  $("file").onchange=async function(){
+    var fs=Array.prototype.slice.call($("file").files,0,6);
+    $("file").value="";
+    for(var i=0;i<fs.length&&atts.length<6;i++){var r=await shrink(fs[i]);if(r)atts.push(r)}
+    renderPrev();
+  };
+
+  function b64(blob){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(",")[1])};r.onerror=rej;r.readAsDataURL(blob)})}
+  async function send(msgs,retry){
+    var pass="";try{pass=sessionStorage.getItem("dp")||""}catch(e){}
+    var r=await fetch("/.netlify/functions/chat",{method:"POST",headers:{"content-type":"application/json","x-pass":pass},body:JSON.stringify({messages:msgs})});
+    if(r.status===401&&!retry){var p=window.prompt("Password?");if(p){try{sessionStorage.setItem("dp",p)}catch(e){}return send(msgs,true)}}
+    var d={};try{d=await r.json()}catch(e){}
+    if(!r.ok)throw new Error(d.error||"Request failed ("+r.status+")");
+    return d.text;
+  }
+  async function ask(text){
+    text=(text||$("q").value).trim();
+    if((!text&&!atts.length)||busy) return;
+    var imgs=atts.slice();
+    if(!text) text="What can you tell me about this? Help with whatever it shows.";
+    busy=true;$("ask").disabled=true;$("q").value="";grow();$("status").textContent="";atts=[];renderPrev();
+    addMsg("user",text,imgs.map(function(a){return a.thumb}));
+    var out=addMsg("ai","Thinking…");
+    try{
+      var content=text;
+      if(imgs.length){content=[];for(var i=0;i<imgs.length;i++)content.push({type:"image_url",image_url:{url:"data:image/jpeg;base64,"+await b64(imgs[i].blob)}});content.push({type:"text",text:text})}
+      var reply=await send(history.concat([{role:"user",content:content}]));
+      out.text.textContent=reply;addCopy(out,reply);
+      history.push({role:"user",content:text+(imgs.length?" [attached "+imgs.length+" image(s)]":"")},{role:"assistant",content:reply});
+    }catch(err){out.text.textContent="Error: "+err.message}
+    busy=false;$("ask").disabled=false;
+  }
+
+  $("ask").onclick=function(){ask()};
+  $("q").addEventListener("input",grow);
+  $("q").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask()}});
+  $("clear").onclick=function(){location.reload()};
+  document.querySelectorAll(".chips button").forEach(function(b){
+    b.onclick=function(){$("q").value=b.dataset.q;$("q").focus();grow()};
+  });
+})();
+</script>
+</body>
+</html>
